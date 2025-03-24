@@ -54,38 +54,42 @@ impl<T, F> JsonParser<T, F> where
         self.ungets.push(c);
     }
 
+    fn emit(&mut self, typ: JsonType) {
+        (self.on_value)(&self.path, typ, &self.value);
+    }
+
     fn read_value(&mut self) -> Result<(), String> {
         while let Some(c) = self.getc()? {
             match c {
-                b'{' => {
+                b'{'=> {
                     self.read_object()?;
-                    (self.on_value)(&self.path, JsonType::Object, &self.value);
+                    self.emit(JsonType::Object);
                 },
                 b'[' => {
                     self.read_array()?;
-                    (self.on_value)(&self.path, JsonType::Array, &self.value);
+                    self.emit(JsonType::Array);
                 },
                 b'0' ..= b'9' | b'-' => {
                     self.ungetc(c);
                     self.read_number()?;
-                    (self.on_value)(&self.path, JsonType::Number, &self.value);
+                    self.emit(JsonType::Number);
                 },
                 b'"' => {
                     self.value.clear();
                     self.read_string(false)?;
-                    (self.on_value)(&self.path, JsonType::String, &self.value);
+                    self.emit(JsonType::String);
                 },
                 b't' => {
                     self.read_literal(b"rue")?;
-                    (self.on_value)(&self.path, JsonType::True, &self.value);
+                    self.emit(JsonType::True);
                 },
                 b'f' => {
                     self.read_literal(b"alse")?;
-                    (self.on_value)(&self.path, JsonType::False, &self.value);
+                    self.emit(JsonType::False);
                 },
                 b'n' => {
                     self.read_literal(b"ull")?;
-                    (self.on_value)(&self.path, JsonType::Null, &self.value);
+                    self.emit(JsonType::Null);
                 },
                 b' ' | b'\t' | b'\r' | b'\n' => continue,
                 _ => return Err("unexpected char".into()),
@@ -172,7 +176,9 @@ impl<T, F> JsonParser<T, F> where
 
                     self.ungetc(c);
                     let l = self.path.len();
-                    self.path.push_str(&format!("[{}]", i));
+                    self.path.push('[');
+                    self.path.push_str(&i.to_string());
+                    self.path.push(']');
 
                     self.read_value()?;
 
